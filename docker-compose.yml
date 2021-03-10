@@ -1,0 +1,96 @@
+version: '3.4'
+
+networks:
+    net:
+
+services:
+
+### MariaDb ########################################
+    maria:
+      build:
+        context: ./db/mariadb
+      container_name: mariadb
+      ports:
+        - "3306:3306"
+      environment:
+        MYSQL_ROOT_PASSWORD: root_psw1
+        MYSQL_DATABASE: db1
+        MYSQL_USER: user1
+        MYSQL_PASSWORD: psw1
+      volumes:
+        - ./db/mysql-data:/var/log/mysql/
+        - ./db/config:/etc/mysql/conf.d
+      networks:
+        - net
+
+
+### ElasticSearch ########################################
+    elasticsearch:
+      build:
+        context: ./elk/elasticsearch   
+      container_name: elasticsearch
+      volumes:
+        - ./elk/elasticsearch:/usr/share/elasticsearch/data      
+      environment:        
+        - bootstrap.memory_lock=true
+        - discovery.type=single-node
+        - "ES_JAVA_OPTS=-Xms4096m -Xmx4096m"
+      ulimits:
+        memlock:
+          soft: -1
+          hard: -1
+        nofile:
+          soft: 65536
+          hard: 65536
+      ports:
+        - "9200:9200"
+        - "9300:9300"      
+      networks:
+        - net
+
+### Logstash ##############################################
+    logstash:
+      build:
+        context: ./elk/logstash
+      container_name: logstash
+      volumes:
+        - ./elk/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml
+        - ./elk/logstash/pipeline/:/usr/share/logstash/pipeline
+        - ./elk/logstash/testlogs:/usr/share/logstash/testlogs/
+      ports:
+        - "5044:5044"
+      networks:
+        - net
+      depends_on:
+        - elasticsearch
+
+### Kibana ##############################################
+    kibana:
+      build:
+        context: ./elk/kibana
+      container_name: kibana
+      ports:
+        - "5601:5601"
+      depends_on:
+        - elasticsearch
+      networks:
+        - net
+
+
+### Filebeat ##############################################
+    filebeat:
+      build:
+        context: ./elk/filebeat/
+      container_name: filebeat
+      volumes:
+#        - ./elk/filebeat/config/filebeat.yml:/usr/share/filebeat/filebeat.yml
+        - ./db/mysql-data/:/usr/share/filebeat/logs/
+#        - ./test/:/usr/share/filebeat/
+      environment:
+        - strict.perms=false
+      depends_on:
+        - logstash
+        - elasticsearch
+        - kibana
+      networks:
+        - net

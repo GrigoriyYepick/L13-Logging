@@ -1,0 +1,15 @@
+input {
+    beats {
+        port => 5044
+        ssl  => false
+    }
+}
+output {
+    elasticsearch {
+        hosts => "elasticsearch:9200"
+    }
+
+    file {
+        path => "/usr/share/logstash/testlogs/test.log"
+    }
+}
