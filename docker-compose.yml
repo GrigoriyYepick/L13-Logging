@@ -30,7 +30,8 @@ services:
         context: ./elk/elasticsearch   
       container_name: elasticsearch
       volumes:
-        - ./elk/elasticsearch:/usr/share/elasticsearch/data      
+  #      - ./elk/elasticsearch:/usr/share/elasticsearch/data
+        - elasticsearch:/usr/share/elasticsearch/data
       environment:        
         - bootstrap.memory_lock=true
         - discovery.type=single-node
@@ -93,3 +94,59 @@ services:
         - kibana
       networks:
         - net
+
+### MongoDB ##############################################
+    mongo:
+      image: mongo:3
+      container_name: mongo
+      volumes:
+        - mongo_data:/data/db
+      ports:
+        - 27017:27017
+      networks:
+        - net
+
+### Graylog ##############################################
+    graylog:
+      image: graylog/graylog:4.0
+      container_name: graylog
+      volumes:
+        - "graylogjournal:/usr/share/graylog/data/journal"
+        - "graylogconfig:/usr/share/graylog/data/config" # ADDED
+      environment:
+        # CHANGE ME (must be at least 16 characters)!
+        - GRAYLOG_PASSWORD_SECRET=somepasswordpepper
+        # Password: admin
+        - GRAYLOG_ROOT_PASSWORD_SHA2=8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+        - GRAYLOG_HTTP_EXTERNAL_URI=http://graylog:9000/
+        - GRAYLOG_IS_MASTER=true
+      entrypoint: /usr/bin/tini -- wait-for-it elasticsearch:9200 --  /docker-entrypoint.sh
+      ports:
+        # Graylog web interface and REST API
+        - 9000:9000
+        # Syslog TCP
+        - 1514:1514
+        # Syslog UDP
+        - 1514:1514/udp
+        # GELF TCP
+        - 12201:12201
+        # GELF UDP
+        - 12201:12201/udp
+      links:
+        - mongo
+        - elasticsearch
+      depends_on:
+        - mongo
+        - elasticsearch
+      networks:
+        - net
+
+volumes:
+    graylogjournal:
+      driver: local
+    graylogconfig: # ADDED
+      driver: local # ADDED
+    mongo_data:
+      driver: local # ADDED
+    elasticsearch:
+      driver: local # ADDED
